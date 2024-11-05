@@ -1,0 +1,346 @@
+load("accident.RData")
+
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(shinythemes)
+
+# Define UI for the application that draws histograms
+ui <- fluidPage(
+  
+  theme = shinythemes::shinytheme("cerulean"),
+  
+  # Main title panel for the entire app
+  titlePanel("Accident Data Analysis"),
+  
+  # Selection inputs at the top with conditional panels
+  fluidRow(
+    # These selections are shown only on Tab 1
+    conditionalPanel(
+      condition = "input.tabs == 'Tab 1 - One Graph'",
+      column(4,
+             selectInput("select_week_day1",
+                         "Select a Weekday",
+                         choices = c("All", "Monday", "Tuesday", 
+                                     "Wednesday", "Thursday", "Friday",
+                                     "Saturday", "Sunday"),
+                         multiple = TRUE,
+                         selected="All"
+             )
+      ),
+      column(4,
+             selectInput("select_state1",
+                         "Select a State",
+                         choices = c("All", state.name),
+                         multiple = TRUE,
+                         selected="All"
+             )
+      ),
+      column(4,
+             selectInput("select_month1",
+                         "Select a Month",
+                         choices = c("All", month.name),
+                         multiple = TRUE,
+                         selected="All"
+             )
+      ),
+      column(4,
+             radioButtons(
+               inputId = "day_or_hour1",  
+               label = "By Day or Hour",
+               choices = c("Day" = "DAY", "Hour" = "HOUR"),
+               selected = "HOUR"
+             )
+      ),
+      column(4,
+             radioButtons(
+               inputId = "filler_1",  
+               label = "Filling Variable",
+               choices = c("Fatalities" = "FATALSTYPE", 
+                           "Weather" = "WEATHERNAME", 
+                           "Road Type" = "ROUTENAME"),
+               selected = "FATALSTYPE"
+             )
+      )
+    ),
+    
+    # These selections are shown only on Tab 2
+    conditionalPanel(
+      condition = "input.tabs == 'Tab 2 - Two Graphs'",
+      column(4,
+             selectInput("select_week_day2",
+                         "Select a Weekday",
+                         choices = c("All", "Monday", "Tuesday", 
+                                     "Wednesday", "Thursday", "Friday",
+                                     "Saturday", "Sunday"),
+                         multiple = TRUE,
+                         selected="All"
+             )
+      ),
+      column(4,
+             selectInput("select_state2",
+                         "Select a State",
+                         choices = c("All", state.name),
+                         multiple = TRUE,
+                         selected="All"
+             )
+      ),
+      column(4,
+             selectInput("select_month2",
+                         "Select a Month",
+                         choices = c("All", month.name),
+                         multiple = TRUE,
+                         selected="All"
+             )
+      ),
+      column(4,
+             selectInput("select_week_day3",
+                         "Select a Second Weekday",
+                         choices = c("All", "Monday", "Tuesday", 
+                                     "Wednesday", "Thursday", "Friday",
+                                     "Saturday", "Sunday"),
+                         multiple = TRUE,
+                         selected="All"
+             )
+      ),
+      column(4,
+             selectInput("select_state3",
+                         "Select a Second State",
+                         choices = c("All", state.name),
+                         multiple = TRUE,
+                         selected="All"
+             )
+      ),
+      column(4,
+             selectInput("select_month3",
+                         "Select a Second Month",
+                         choices = c("All", month.name),
+                         multiple = TRUE,
+                         selected="All"
+             )
+      ),
+      column(4,
+             radioButtons(
+               inputId = "day_or_hour2",  
+               label = "By Day or Hour",
+               choices = c("Day" = "DAY", "Hour" = "HOUR"),
+               selected = "HOUR"
+             )
+      ),
+      column(4,
+             radioButtons(
+               inputId = "filler_2_1",  # Use a distinct input ID for the second tab
+               label = "Filling Variable 1",
+               choices = c("Fatalities" = "FATALSTYPE", 
+                           "Weather" = "WEATHERNAME", 
+                           "Road Type" = "ROUTENAME"),
+               selected = "FATALSTYPE"
+             )
+      ),
+      column(4,
+             radioButtons(
+               inputId = "filler_2_2",  # Use a distinct input ID for the second tab
+               label = "Filling Variable 2",
+               choices = c("Fatalities" = "FATALSTYPE", 
+                           "Weather" = "WEATHERNAME", 
+                           "Road Type" = "ROUTENAME"),
+               selected = "FATALSTYPE"
+             )
+      )
+    ),
+    
+    # Tabbed layout for different views
+    tabsetPanel(
+      id = "tabs",
+      tabPanel("Tab 1 - One Graph",
+               titlePanel("Accident Data for One Selection"),
+               mainPanel(
+                 plotOutput("distPlot_tab1", width = "100%", height = "500px")  # Full width and specific height
+               )
+      ),
+      
+      tabPanel("Tab 2 - Two Graphs",
+               titlePanel("Two Selections"),
+               mainPanel(
+                 plotOutput("distPlot1", width = "100%", height = "500px"),
+                 plotOutput("distPlot2_tab2", width = "100%", height = "500px")
+               )
+      )
+    )
+  )
+)
+
+# Define server logic required to draw the histograms
+server <- function(input, output, session) {
+  
+  # Displays Error Message
+  checkSelections <- function(selection) {
+    if ("All" %in% selection && length(selection) > 1) {
+      showNotification(
+        tags$div(
+          style = "font-size: 18px; font-weight: bold; color: red; background-color: yellow; padding: 10px; border: 2px solid red; border-radius: 5px;",
+          "Deselect 'All' to select specific options."
+        ),
+        type = "error",
+        duration = 10
+      )
+      return(FALSE)
+    }
+    return(TRUE)
+  }
+  
+  output$distPlot_tab1 <- renderPlot({
+    if (!checkSelections(input$select_week_day1) || 
+        !checkSelections(input$select_state1) || 
+        !checkSelections(input$select_month1)) {
+      return()  # Stop rendering if "All" and another value are selected
+    }
+    
+    df1 <- accident 
+    if (!"All" %in% input$select_week_day1) {
+      df1 <- df1 %>%
+        filter(DAY_WEEKNAME %in% input$select_week_day1)
+    }
+    
+    if (!"All" %in% input$select_state1) {
+      df1 <- df1 %>%
+        filter(STATENAME %in% input$select_state1)
+    }
+    
+    if (!"All" %in% input$select_month1) {
+      df1 <- df1 %>%
+        filter(MONTHNAME %in% input$select_month1)
+    }
+    
+    # Determine the x-axis and fill variable based on user selection
+    x_axis <- if (input$day_or_hour1 == "DAY") "DAY" else "HOUR"  
+    fill_type <- input$filler_1  
+    x_label <- if (x_axis == "DAY") "Days" else "Hours"
+    legend_title <- switch(fill_type,
+                           "FATALS" = "Fatalities",
+                           "WEATHER" = "Weather",
+                           "ROAD_TYPE" = "Road Type",
+                           "Unknown")  # Default case if none match
+    
+    ggplot(df1, aes_string(x = x_axis, fill = fill_type)) +
+      geom_bar() +
+      labs(
+        title = "Bargraph - Tab 1",
+        x = x_label,
+        fill = legend_title
+      ) +
+      theme(
+        text = element_text(size = 16),
+        axis.title.x = element_text(size = 18),
+        axis.title.y = element_text(size = 18),
+        plot.title = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 14)
+      )
+  })
+  
+  output$distPlot1 <- renderPlot({
+    if (!checkSelections(input$select_week_day2) || 
+        !checkSelections(input$select_state2) || 
+        !checkSelections(input$select_month2)) {
+      return()  # Stop rendering if "All" and another value are selected
+    }
+    
+    df2 <- accident 
+    if (!"All" %in% input$select_week_day2) {
+      df2 <- df2 %>%
+        filter(DAY_WEEKNAME %in% input$select_week_day2)
+    }
+    
+    if (!"All" %in% input$select_state2) {
+      df2 <- df2 %>%
+        filter(STATENAME %in% input$select_state2)
+    }
+    
+    if (!"All" %in% input$select_month2) {
+      df2 <- df2 %>%
+        filter(MONTHNAME %in% input$select_month2)
+    }
+    
+    # Determine the x-axis and fill variable based on user selection
+    x_axis <- if (input$day_or_hour2 == "DAY") "DAY" else "HOUR"  
+    fill_type <- input$filler_2_1  
+    x_label <- if (x_axis == "DAY") "Days" else "Hours"
+    legend_title <- switch(fill_type,
+                           "FATALS" = "Fatalities",
+                           "WEATHER" = "Weather",
+                           "ROAD_TYPE" = "Road Type",
+                           "Unknown")  # Default case if none match
+    
+    ggplot(df2, aes_string(x = x_axis, fill = fill_type)) +
+      geom_bar() +
+      labs(
+        title = "First Bargraph - Tab 2",
+        x = x_label,
+        fill = legend_title
+      ) +
+      theme(
+        text = element_text(size = 16),
+        axis.title.x = element_text(size = 18),
+        axis.title.y = element_text(size = 18),
+        plot.title = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 14)
+      )
+  })
+  
+  output$distPlot2_tab2 <- renderPlot({
+    if (!checkSelections(input$select_week_day3) || 
+        !checkSelections(input$select_state3) || 
+        !checkSelections(input$select_month3)) {
+      return()  # Stop rendering if "All" and another value are selected
+    }
+    
+    df3 <- accident 
+    if (!"All" %in% input$select_week_day3) {
+      df3 <- df3 %>%
+        filter(DAY_WEEKNAME %in% input$select_week_day3)
+    }
+    
+    if (!"All" %in% input$select_state3) {
+      df3 <- df3 %>%
+        filter(STATENAME %in% input$select_state3)
+    }
+    
+    if (!"All" %in% input$select_month3) {
+      df3 <- df3 %>%
+        filter(MONTHNAME %in% input$select_month3)
+    }
+    
+    # Determine the x-axis and fill variable based on user selection
+    x_axis <- if (input$day_or_hour2 == "DAY") "DAY" else "HOUR"  
+    fill_type <- input$filler_2_2 
+    x_label <- if (x_axis == "DAY") "Days" else "Hours"
+    legend_title <- switch(fill_type,
+                           "FATALS" = "Fatalities",
+                           "WEATHER" = "Weather",
+                           "ROAD_TYPE" = "Road Type",
+                           "Unknown")  # Default case if none match
+    
+    ggplot(df3, aes_string(x = x_axis, fill = fill_type)) +
+      geom_bar() +
+      labs(
+        title = "Second Bargraph - Tab 2",
+        x = x_label,
+        fill = legend_title
+      ) +
+      theme(
+        text = element_text(size = 16),
+        axis.title.x = element_text(size = 18),
+        axis.title.y = element_text(size = 18),
+        plot.title = element_text(size = 20, face = "bold"),
+        legend.title = element_text(size = 16),
+        legend.text = element_text(size = 14)
+      )
+    
+  
+})
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
